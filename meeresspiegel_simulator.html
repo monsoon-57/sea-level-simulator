@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Meeresspiegelanstieg Simulator</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <style>
+    :root{
+      --bg:#0b1220; --bg2:#0d1322; --panel:#111a2b; --panel-2:#0e1626; --text:#e8eefc; --muted:#a8b3c9;
+      --blue:#2d7ef7; --blue-200:#9ec3ff; --ok:#22c55e; --warn:#fbbf24; --danger:#ef4444;
+      --border:#162038; --shadow:0 10px 30px rgba(0,0,0,.35); --radius:18px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; color:var(--text);
+      background:linear-gradient(180deg,var(--bg),var(--bg2));}
+    .container{max-width:1200px; margin:24px auto 56px; padding:0 16px}
+
+    .hero{background:rgba(16,24,40,.7); border:1px solid var(--border); border-radius:24px; padding:18px 22px; box-shadow:var(--shadow); backdrop-filter:blur(6px); margin-bottom:18px}
+    .hero h1{margin:0 0 6px; font-size:clamp(1.4rem,3vw,2rem)}
+    .hero p{margin:0; color:var(--muted)}
+
+    .grid{display:grid; grid-template-columns:360px 1fr; gap:18px}
+    @media (max-width: 980px){ .grid{grid-template-columns:1fr} }
+
+    .card{background:linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%); border-radius:var(--radius); box-shadow:var(--shadow); border:1px solid var(--border)}
+    .card .card-body{padding:16px}
+
+    .sidebar .section-title{font-weight:800; display:flex; align-items:center; gap:.5rem; margin-bottom:8px}
+    .seg{display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap}
+    .seg button{border:1px solid #20355f; background:#15213a; color:#cfe0ff; padding:8px 10px; border-radius:12px; cursor:pointer; font-weight:700}
+    .seg button.active{background:#0f1c36; border-color:#2b4c86}
+
+    .slider-wrap{background:#0c1a34; border:1px solid #18305c; border-radius:12px; padding:10px; margin:8px 0 10px}
+    .slider-wrap label{display:block; font-weight:700; margin-bottom:6px}
+    input[type=range]{ -webkit-appearance:none; width:100%; height:12px; background:#162038; border-radius:999px; outline:none }
+    input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:22px; height:22px; border-radius:50%; background:var(--blue); border:2px solid var(--blue-200); box-shadow:0 0 0 6px rgba(45,126,247,.15)}
+    input[type=range]::-moz-range-thumb{ width:22px; height:22px; border:none; border-radius:50%; background:var(--blue)}
+
+    .value{font-size:28px; font-weight:900; text-align:center; margin:8px 0; color:#ffd1d1; background:#0e1a33; border:1px solid #2a3c6e; border-radius:12px; padding:6px}
+
+    .btnrow{display:flex; gap:10px; margin:8px 0 14px}
+    .btn{cursor:pointer; border:none; border-radius:12px; padding:.7rem .9rem; font-weight:800}
+    .btn.primary{ background:linear-gradient(180deg,#2e7df4 0%, #1f5fdc 100%); color:white }
+    .btn.gray{ background:#1a2742; color:#dbe7ff; border:1px solid #22355e }
+
+    .citylist{background:#0c1a34; border:1px solid #18305c; border-radius:12px; max-height:300px; overflow:auto}
+    .citylist h4{margin:10px 10px 2px}
+    .city{display:flex; gap:8px; align-items:center; padding:8px 10px; border-top:1px solid #19315f; font-size:.95rem}
+    .dot{width:10px; height:10px; border-radius:99px; background:#9aa6bf; border:2px solid #1b2b4b}
+
+    .map-wrap{position:relative; padding:12px}
+    #map{height:560px; width:100%; border-radius:var(--radius); overflow:hidden; border:1px solid var(--border)}
+    .leaflet-container{background:#a9c3e8}
+
+    /* kompakte Legende */
+    .leg{position:absolute; right:12px; top:12px; background:rgba(10,17,31,.92); color:var(--text); border:1px solid var(--border); border-radius:10px; box-shadow:var(--shadow); padding:8px; font-size:.8rem; max-width:220px; z-index:1200; line-height:1.2}
+    .leg .row{display:flex; align-items:center; gap:6px; margin:4px 0}
+    .sw{width:10px; height:10px; border-radius:3px; border:1px solid #9ec3ff}
+    .sw.blue{background:rgba(45,126,247,.55)}
+    .sw.green{background:#22c55e; border-color:#1ea64f}
+    .sw.yellow{background:#fbbf24; border-color:#e0a912}
+    .sw.gray{background:#d8e2f1; border-color:#c7d4ea}
+
+    .info-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-top:18px}
+    @media (max-width: 980px){ .info-grid{grid-template-columns:1fr} }
+    .info-card h3{margin:0 0 6px}
+    .info-card p{margin:0; color:var(--muted)}
+
+    footer{max-width:1200px; margin:20px auto 28px; padding:0 16px; color:var(--muted); font-size:.9rem}
+
+    .sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <h1>🌊 Meeresspiegelanstieg Simulator</h1>
+      <p>Entdecke die globalen Auswirkungen des Klimawandels. Erkunde interaktiv, wie sich verschiedene Anstiegs‑Szenarien auf Küstenstädte und Länder auswirken.</p>
+    </div>
+
+    <div class="grid">
+      <!-- Sidebar -->
+      <div class="card sidebar">
+        <div class="card-body">
+          <div class="seg" role="group" aria-label="Region wählen">
+            <button class="active" data-region="welt">Welt</button>
+            <button data-region="nordamerika">Nordamerika</button>
+            <button data-region="asien">Asien</button>
+            <button data-region="europa">Europa</button>
+          </div>
+
+          <div class="section">
+            <div class="section-title">📊 Meeresspiegel einstellen</div>
+            <div class="slider-wrap">
+              <label for="seaLevel">Anstieg in Metern</label>
+              <input id="seaLevel" type="range" min="0" max="5" value="0.5" step="0.1" aria-label="Meeresspiegel in Metern" />
+              <div class="value" id="seaLevelLabel">0.5 Meter</div>
+              <div class="btnrow">
+                <button class="btn gray" id="btn-reset">Zurücksetzen</button>
+                <button class="btn primary" id="btn-szenario">Szenario</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">📍 Städte‑Status</div>
+            <div class="citylist" id="cityList">
+              <h4 style="margin-top:8px;">Aktueller Stand</h4>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Map -->
+      <div class="card map-wrap">
+        <div id="map" aria-label="Interaktive Weltkarte (Deutsch)"></div>
+        <div class="leg" id="legendBox">
+          <div><strong>Legende</strong></div>
+          <div class="row"><span class="sw blue"></span>Überschwemmungsgebiete</div>
+          <div class="row"><span class="sw yellow"></span>Gefährdete Städte</div>
+          <div class="row"><span class="sw green"></span>Sichere Städte</div>
+          <div class="row"><span class="sw gray"></span>Küstenlinien</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info -->
+    <div class="info-grid" style="margin-top:18px">
+      <div class="card info-card"><div class="card-body">
+        <h3>🧪 Was passiert beim Meeresspiegelanstieg?</h3>
+        <ul>
+          <li><strong>Thermische Ausdehnung:</strong> wärmeres Wasser dehnt sich aus.</li>
+          <li><strong>Gletscherschmelze:</strong> Landeis schmilzt und fließt ins Meer.</li>
+          <li><strong>Eisschild-Kollaps:</strong> Grönland & Antarktis werden instabil.</li>
+        </ul>
+      </div></div>
+      <div class="card info-card"><div class="card-body">
+        <h3>🌍 Welche Folgen hat es?</h3>
+        <ul>
+          <li>Küstenstädte & Flussdeltas gefährdet</li>
+          <li>Landwirtschaft: Versalzung</li>
+          <li>Trinkwasser & Infrastruktur betroffen</li>
+        </ul>
+      </div></div>
+      <div class="card info-card"><div class="card-body">
+        <h3>💡 Was können wir tun?</h3>
+        <ul>
+          <li>Erneuerbare Energien, ÖPNV</li>
+          <li>Energie sparen</li>
+          <li>Regional & saisonal konsumieren</li>
+        </ul>
+      </div></div>
+    </div>
+  </div>
+
+  <footer>
+    © <span id="year"></span> – Lehrprojekt „Meeresspiegelanstieg“. Einwohnerzahlen: grobe Schätzwerte (Datenstand 2024/2025).
+  </footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script>
+  // ===== INITIALISIERUNG & HILFE =====
+  const SoftErr = {
+    show(msg){
+      let box = document.getElementById('soft-error');
+      if(!box){ box = document.createElement('div'); box.id='soft-error'; box.style.cssText='position:fixed;bottom:12px;left:12px;background:#2a0e11;border:1px solid #dc2626;color:#ffdede;padding:8px 10px;border-radius:8px;z-index:2000;font:12px/1.2 system-ui'; document.body.appendChild(box); }
+      box.textContent = 'Fehler: ' + msg;
+    }
+  };
+  window.addEventListener('error', e=>SoftErr.show(e.message||String(e)));
+
+  // Footer-Jahr
+  document.getElementById('year').textContent = new Date().getFullYear();
+
+  // Zustand & Controls
+  const state = { level: 0.5, overlayOpacity: 0.55 };
+  const slider = document.getElementById('seaLevel');
+  const label  = document.getElementById('seaLevelLabel');
+  const btnReset = document.getElementById('btn-reset');
+  const btnSzen  = document.getElementById('btn-szenario');
+  function setLabel(){ if(label && slider) label.textContent = `${parseFloat(slider.value).toFixed(1)} Meter`; }
+  if(slider){ slider.addEventListener('input', setLabel); setLabel(); }
+
+  // ===== LEAFLET KARTE =====
+  const map = L.map('map', {
+    zoomControl: true,
+    dragging: true,
+    scrollWheelZoom: true,
+    doubleClickZoom: true,
+    boxZoom: true,
+    keyboard: true,
+    tap: true,
+    attributionControl: true,
+    worldCopyJump: true,
+    maxBounds: [[-85,-180],[85,180]],
+    maxBoundsViscosity: 1.0,
+    maxZoom: 12,
+    minZoom: 2
+  });
+  const osmDe = L.tileLayer('https://{s}.tile.openstreetmap.de/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap Deutschland, OSM-Mitwirkende', noWrap:false }).addTo(map);
+  map.fitBounds([[-85,-180],[85,180]], { padding:[10,10] });
+
+  // Regionen-Buttons
+  (function initRegionButtons(){
+    const regions = {
+      welt:        { type:'bounds', b:[[-85,-180],[85,180]] },
+      europa:      { type:'view',   c:[54,10],  z:4 },
+      nordamerika: { type:'view',   c:[39,-98], z:4 },
+      asien:       { type:'view',   c:[25,100], z:3 }
+    };
+    document.querySelectorAll('[data-region]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        document.querySelectorAll('[data-region]').forEach(x=>x.classList.remove('active'));
+        btn.classList.add('active');
+        const r = regions[btn.dataset.region]; if(!r) return;
+        if(r.type==='bounds') map.fitBounds(r.b, {padding:[10,10]}); else map.setView(r.c, r.z);
+      });
+    });
+  })();
+
+  // Küstenlinien
+  fetch('https://unpkg.com/@geo-maps/coastline-110m/geojson/coastline-110m.geo.json')
+    .then(r=>r.json()).then(geo=>{ L.geoJSON(geo, { style: { color:'#b9c6db', weight:1, opacity:0.9 } }).addTo(map); }).catch(()=>{});
+
+  // Überflutungs-Overlay (Terrarium)
+  const terrariumUrl = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
+  const FloodLayer = L.GridLayer.extend({
+    createTile: function(coords){
+      const tile = document.createElement('canvas'); tile.width=256; tile.height=256; const ctx = tile.getContext('2d');
+      const img = new Image(); img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try{
+          ctx.drawImage(img,0,0); const d = ctx.getImageData(0,0,256,256); const a = d.data; const Lm = state.level;
+          for(let i=0;i<a.length;i+=4){
+            const R=a[i], G=a[i+1], B=a[i+2];
+            const elev = (R*256 + G + B/256) - 32768;
+            if(elev <= Lm){ a[i]=45; a[i+1]=126; a[i+2]=247; a[i+3]=Math.round(255*state.overlayOpacity); }
+            else { a[i+3]=0; }
+          }
+          ctx.putImageData(d,0,0);
+        }catch(e){ ctx.clearRect(0,0,256,256); }
+      };
+      img.onerror = ()=>{ ctx.clearRect(0,0,256,256); };
+      img.src = L.Util.template(terrariumUrl, coords);
+      return tile;
+    }
+  });
+  const floodLayer = new FloodLayer().addTo(map);
+  function redraw(){ floodLayer.redraw(); updateCities(); }
+
+  // ===== STÄDTE =====
+  const cities = [
+    {name:'Venedig', lat:45.44, lng:12.33, risk:0.5, flood:1.0, pop:'0,26 Mio'},
+    {name:'Amsterdam', lat:52.37, lng:4.90, risk:0.7, flood:1.5, pop:'0,9 Mio'},
+    {name:'Rotterdam', lat:51.92, lng:4.48, risk:0.7, flood:1.5, pop:'0,7 Mio'},
+    {name:'Kopenhagen', lat:55.68, lng:12.57, risk:0.8, flood:1.8, pop:'0,8 Mio'},
+    {name:'Antwerpen', lat:51.22, lng:4.40, risk:0.7, flood:1.6, pop:'0,5 Mio'},
+    {name:'Hamburg', lat:53.55, lng:9.99, risk:1.0, flood:2.0, pop:'1,9 Mio'},
+    {name:'London', lat:51.50, lng:-0.12, risk:1.5, flood:3.0, pop:'9 Mio'},
+    {name:'New York', lat:40.71, lng:-74.00, risk:1.0, flood:2.0, pop:'8,5 Mio'},
+    {name:'Miami', lat:25.76, lng:-80.19, risk:0.8, flood:1.2, pop:'6 Mio'},
+    {name:'New Orleans', lat:29.95, lng:-90.07, risk:0.6, flood:1.0, pop:'1,3 Mio'},
+    {name:'Buenos Aires', lat:-34.61, lng:-58.38, risk:1.0, flood:2.0, pop:'15 Mio'},
+    {name:'Rio de Janeiro', lat:-22.91, lng:-43.17, risk:1.2, flood:2.5, pop:'13 Mio'},
+    {name:'Sydney', lat:-33.87, lng:151.21, risk:1.2, flood:2.5, pop:'5,3 Mio'},
+    {name:'Alexandria', lat:31.20, lng:29.92, risk:0.8, flood:1.8, pop:'5 Mio'},
+    {name:'Kairo (Nil-Delta)', lat:30.04, lng:31.24, risk:1.2, flood:2.5, pop:'20 Mio (Großraum)'},
+    {name:'Lagos', lat:6.46, lng:3.39, risk:0.7, flood:1.5, pop:'15 Mio'},
+    {name:'Dhaka', lat:23.78, lng:90.40, risk:0.8, flood:2.0, pop:'10 Mio'},
+    {name:'Chittagong', lat:22.36, lng:91.80, risk:0.8, flood:2.0, pop:'2,6 Mio'},
+    {name:'Bangkok', lat:13.75, lng:100.50, risk:0.5, flood:1.5, pop:'10,5 Mio'},
+    {name:'Ho-Chi-Minh-Stadt', lat:10.82, lng:106.63, risk:0.7, flood:1.5, pop:'9 Mio'},
+    {name:'Manila', lat:14.60, lng:120.98, risk:0.7, flood:1.8, pop:'14 Mio'},
+    {name:'Kolkata', lat:22.57, lng:88.36, risk:0.8, flood:2.0, pop:'14 Mio'},
+    {name:'Guangzhou', lat:23.13, lng:113.26, risk:0.8, flood:2.0, pop:'15 Mio'},
+    {name:'Shanghai', lat:31.23, lng:121.47, risk:0.8, flood:2.0, pop:'24 Mio'},
+    {name:'Shenzhen', lat:22.55, lng:114.06, risk:0.9, flood:2.0, pop:'12,5 Mio'},
+    {name:'Osaka', lat:34.69, lng:135.50, risk:0.8, flood:1.8, pop:'19 Mio'},
+    {name:'Tokio', lat:35.68, lng:139.69, risk:1.2, flood:2.5, pop:'37 Mio'}
+  ];
+  const cityLayer = L.layerGroup().addTo(map);
+  const cityItems = [];
+  function statusFor(c, lvl){ if(lvl >= c.flood) return 'überflutet'; if(lvl >= c.risk) return 'gefährdet'; return 'sicher'; }
+  function colorFor(s){ return s==='überflutet' ? '#2d7ef7' : (s==='gefährdet' ? '#fbbf24' : '#22c55e'); }
+  function makeCity(c){
+    const m = L.circleMarker([c.lat,c.lng], {radius:8, weight:2, color:'#1b2b4b', fillColor:'#22c55e', fillOpacity:.9}).addTo(cityLayer);
+    m.on('mouseover', ()=>{
+      const s = statusFor(c, state.level);
+      const txt = `<strong>${c.name}</strong><br>Status: <strong>${s}</strong> bei ${state.level.toFixed(1)} m<br>Einwohner (≈): ${c.pop} <small>(Stand 2024/2025)</small>`;
+      m.bindTooltip(txt, {direction:'top', offset:[0,-6], opacity:0.95, sticky:true}).openTooltip();
+    });
+    m.on('mouseout', ()=> m.closeTooltip());
+    cityItems.push({c, m});
+  }
+  cities.forEach(makeCity);
+
+  const cityList = document.getElementById('cityList');
+  function renderCityList(){
+    const lvl = state.level;
+    const rank = s => (s==='überflutet'?0:(s==='gefährdet'?1:2));
+    const sorted = [...cities].sort((a,b)=>{
+      const sa=statusFor(a,lvl), sb=statusFor(b,lvl);
+      if(rank(sa)!==rank(sb)) return rank(sa)-rank(sb);
+      const da=Math.max(0,lvl-a.flood), db=Math.max(0,lvl-b.flood);
+      return db-da;
+    });
+    cityList.innerHTML = '<h4 style="margin-top:8px;">Aktueller Stand</h4>' +
+      sorted.map(c=>{ const s = statusFor(c, lvl); const color = colorFor(s); return `<div class="city"><span class="dot" style="background:${color}"></span><div><strong>${c.name}</strong> (${c.pop}) – ${s.charAt(0).toUpperCase()+s.slice(1)}</div></div>`; }).join('');
+  }
+  function updateCities(){ const lvl = state.level; cityItems.forEach(({c,m})=> m.setStyle({fillColor: colorFor(statusFor(c,lvl))})); renderCityList(); }
+  renderCityList();
+
+  if(slider){ slider.addEventListener('change', ()=>{ state.level = parseFloat(slider.value); redraw(); setLabel(); }); }
+  if(btnReset){ btnReset.addEventListener('click', ()=>{ slider.value = 0.5; state.level = 0.5; setLabel(); redraw(); map.fitBounds([[-85,-180],[85,180]], {padding:[10,10]}); }); }
+  if(btnSzen){ const presets = [0.5, 1.0, 2.0, 3.0]; btnSzen.addEventListener('click', ()=>{ const cur = parseFloat(slider.value); let idx = presets.findIndex(p=>Math.abs(p-cur)<1e-6); idx = (idx+1) % presets.length; slider.value = presets[idx]; state.level = presets[idx]; setLabel(); redraw(); }); }
+
+  </script>
+</body>
+</html>
